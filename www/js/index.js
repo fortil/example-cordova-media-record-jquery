@@ -43,8 +43,8 @@ document.addEventListener('deviceready', function(){
             "x-amz-meta-idregistro": idRegistro,
           },
           meta:[
-             ["starts-with", "$x-amz-meta-idpregunta", ""],
-             ["starts-with", "$x-amz-meta-idregistro", ""],
+            ["starts-with", "$x-amz-meta-idpregunta", ""],
+            ["starts-with", "$x-amz-meta-idregistro", ""]
           ]
         },
         true
