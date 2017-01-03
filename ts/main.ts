@@ -29,7 +29,7 @@ declare global {
     remove(o: any): any;
   }
 }
-function MakeId(){
+function MakeId():string{
   var text = "";
   var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
@@ -86,46 +86,39 @@ interface filesParamsInterface{
   selector?:any
   idRegistro?:string
   idPregunta?:string
-  max?:number
   date?:any
 }
 
 interface argsInterface{ 
+  idRegistro:string
+  idPregunta:string
+  maxRecords:number
+  maxTime:number
+  cordovaDir:string
   selector:any
-  idRegistro?:string
-  idPregunta?:string
-  max?:number
-  nameServer:string 
-  cordovaDir?:string
+  success?:any
+  error?:any
 }
 
+interface argumentosInterface{selector:any, idRegistro:string, idPregunta:string, maxRecords:number, maxTime:number}
+
 class RecordMedia {
-  arguments:argsInterface
+  argumentos:argumentosInterface
   audio:any
   DB:any
   cordovaDir:string
-  icons:{playIcon:string, stopIcon:string, deleteIcon:string}
+  icons: { playIcon:string, stopIcon:string, deleteIcon:string }
   strings:interfaceStrings
   record:any
   functions:any;
 
-  constructor ({ idRegistro, idPregunta, max, nameServer, selector, cordovaDir }:argsInterface){
-    this.arguments = {
-      selector,
-      idRegistro: (idRegistro || MakeId() ),
-      idPregunta: (idPregunta || MakeId() ),
-      max: (max || 10000 ),
-      nameServer: (nameServer || undefined ),
-    };
+  constructor ({ idRegistro = MakeId(), idPregunta = MakeId(), maxRecords = 10, maxTime = 10, cordovaDir = cordova.file.externalDataDirectory, selector = 'div' }:argsInterface){
+    this.argumentos = { selector, idRegistro, idPregunta, maxRecords, maxTime };
     this.audio = {};
     this.DB;
-    this.cordovaDir = cordovaDir || cordova.file.externalDataDirectory;
+    this.cordovaDir = cordovaDir;
     // Default Icons
-    this.icons = {
-      playIcon: this.getIcon('play_arrow'),
-      stopIcon: this.getIcon('pause'),
-      deleteIcon: this.getIcon('clear')
-    };
+    this.icons = { playIcon: this.getIcon('play_arrow'), stopIcon: this.getIcon('pause'), deleteIcon: this.getIcon('clear') };
     // Default strings
     this.strings = {
       recording: 'Detener grabación',
@@ -136,22 +129,20 @@ class RecordMedia {
       fields: 'id,name,path,idRegistro,idPregunta,type,duration,date',
       tablename: 'RECORDS',
     };
-    this.record = { recording: false };
+    this.record = { recording: false, timerOut: null };
   }
 
   getIcon(icon:string){
     return `<i class="material-icons md-18">${icon}</i>`; 
   }
 
-  init({ success, error }:any){
-    let rec = this.recordAudio.bind(this);
-    let agrs = this.arguments;
+  init({ success = (res:any) => console.log(res), error = (error:any) => console.log(error) }){
 
-    let btn = document.querySelector(this.arguments.selector);
+    let btn = document.querySelector(this.argumentos.selector);
     // let btn = $(''+this.arguments.selector);
-    btn.addEventListener('click', (evt:any)=>{
+    btn.addEventListener('click', (evt:any) => {
       evt.preventDefault();
-      rec( agrs );
+      this.recordAudio( this.argumentos )
     }, false)
 
     // Otiene los strings a mostrar, sino hay deja los default
@@ -179,29 +170,29 @@ class RecordMedia {
     // });
 
     let divMsj = document.createElement('div');
-    divMsj.className = `mensaje alignAbsoluteCenter ${this.arguments.idRegistro} ${this.arguments.idPregunta}`
+    divMsj.className = `mensaje alignAbsoluteCenter ${this.argumentos.idRegistro} ${this.argumentos.idPregunta}`
     divMsj.innerHTML = divMsj.innerHTML + this.strings.mjsrecord
     btn.parentNode.insertBefore(divMsj, btn)
 
     // btn.after(this.strings.mjsdivrecord);
-    this.initView.bind(this)();
+    this.initView();
   }
 
   initView( ){
     // JS form
-    let medias = document.querySelector('#content-'+this.arguments.idRegistro+'_'+this.arguments.idPregunta);
+    let medias = document.querySelector('#content-'+this.argumentos.idRegistro+'_'+this.argumentos.idPregunta);
     if( medias != undefined )
       medias.innerHTML = ''
 
-    let idRegistro = this.arguments.idRegistro;
-    let idPregunta = this.arguments.idPregunta;
+    let idRegistro = this.argumentos.idRegistro;
+    let idPregunta = this.argumentos.idPregunta;
 
     this.DB.getVal({ idPregunta, idRegistro }, (tx:any, songs:any[]) => {
 
       if(songs.length > 0){
         for (var i = 0; i < songs.length; i++) {
-          songs[i].selector = this.arguments.selector;
-          songs[i].max = this.arguments.max;
+          songs[i].selector = this.argumentos.selector;
+          songs[i].maxRecords = this.argumentos.maxRecords;
           this.addAudioView(songs[i]);
         }
       }
@@ -216,7 +207,7 @@ class RecordMedia {
     // $('.play.'+id).html(icon);
   }
 
-  playPauseAudio( { id, path, name, selector, idRegistro, idPregunta, max }:filesParamsInterface ){
+  playPauseAudio( { id, path, name, selector, idRegistro, idPregunta }:filesParamsInterface ){
     let playIcon = this.icons.playIcon;
     let stopIcon = this.icons.stopIcon;
     let element:any = document.getElementsByClassName('range ex1-'+id)[0];
@@ -285,7 +276,7 @@ class RecordMedia {
     }
 
   }
-  removeAudio( { id, path, name, selector, idRegistro, idPregunta, max }:filesParamsInterface ){
+  removeAudio( { id, path, name, selector, idRegistro, idPregunta }:filesParamsInterface ){
 
     if(confirm(this.strings.dialogconfirm+' '+name)){
       resolveLocalFileSystemURL( this.cordovaDir, (dir:any) => {
@@ -308,27 +299,38 @@ class RecordMedia {
 
   }
 
-  recordAudio({ selector, idRegistro, idPregunta, max }:filesParamsInterface){
+  recordAudio({ selector, idRegistro, idPregunta, maxRecords, maxTime }:argumentosInterface){
     let store = this.cordovaDir; //externalApplicationStorageDirectory; // window.externalApplicationStorageDirectory || window.PERSISTENT || window.TEMPORARY;
     let id = Date.now();
     let name =   idRegistro + '_' + idPregunta + '__' + id +'.amr';
     let path = store + name;
     this.DB.getVal(null, (tx:any, songs:Array<any>) => {
+
       let lengthSongs = songs.length || ( typeof songs == 'object' ? Object.keys(songs).length : 0)
-      if( lengthSongs >= max ){
+      if( lengthSongs >= maxRecords ){
         this.functions.error(this.strings.alertmaxrecord);
       }else{
         if( this.record.recording == true ){
+          clearTimeout( this.record.timerOut );
           this.record.media.stopRecord();
           this.record.recording = false;
-          this.stopRecordView.bind(this)( selector );
+          this.stopRecordView( selector );
         }else{
+
+          this.record.timerOut = setTimeout(()=>{
+            if( this.record.recording == true ){
+              clearTimeout( this.record.timerOut );
+              this.record.media.stopRecord();
+              this.record.recording = false;
+              this.stopRecordView( selector );
+            }
+          }, this.argumentos.maxTime )
 
           this.record.recording = true;
           this.record.media = new Media( path , 
             (e:any) => { 
               this.functions.error("Success ",e)
-              this.addAudio({ id, path, name, selector, idRegistro, idPregunta, max }); 
+              this.addAudio({ id, path, name, selector, idRegistro, idPregunta }); 
             }, 
             this.functions.error );
           this.record.media.startRecord();
@@ -340,22 +342,22 @@ class RecordMedia {
 
   }
 
-  addAudio({ id, path, name, selector, idRegistro, idPregunta, max }:filesParamsInterface){
+  addAudio({ id, path, name, selector, idRegistro, idPregunta }:filesParamsInterface){
     // ['id', 'name', 'path', 'idRegistro', 'idPregunta', 'type', 'duration', 'date']
     let date = new Date().getTime();
     this.DB.insert( {id, name, path, idRegistro, idPregunta, 'type':'audio', 'duration':'4.0', date } ); 
-    this.addAudioView.bind(this)({ id, path, name, selector, idRegistro, idPregunta, max, date })
+    this.addAudioView.bind(this)({ id, path, name, selector, idRegistro, idPregunta, date })
   }
 
   startRecordView( selector:any ){
     document.querySelector( selector + '').innerHTML = this.strings.recording;
-    let doc = document.getElementsByClassName( 'mensaje '+this.arguments.idRegistro+' '+this.arguments.idPregunta)[0]  as HTMLDivElement
+    let doc = document.getElementsByClassName( 'mensaje '+this.argumentos.idRegistro+' '+this.argumentos.idPregunta)[0]  as HTMLDivElement
     doc.style.visibility = 'visible';
   }
 
   stopRecordView( selector:any ){
     document.querySelector( selector + '').innerHTML = this.strings.stoprecord;
-    let doc = document.getElementsByClassName( 'mensaje '+this.arguments.idRegistro+' '+this.arguments.idPregunta)[0]  as HTMLDivElement
+    let doc = document.getElementsByClassName( 'mensaje '+this.argumentos.idRegistro+' '+this.argumentos.idPregunta)[0]  as HTMLDivElement
     doc.style.visibility = 'hidden';
   }
 
@@ -391,23 +393,31 @@ class RecordMedia {
     let dateStr = `${date[0]} ${time}`;
     return `<div class="MediaRecord-media ${audio.id} ${audio.idRegistro} ${audio.idPregunta}">
       <div class="MediaRecord-buttons-media">
-        <button data-url="${audio.path}" data-name="${audio.name}" class="play ${audio.id}">${this.icons.playIcon}</button>
+        <button data-url="${audio.path}" data-name="${audio.name}"  data-idregistro="${audio.idRegistro}" data-idpregunta="${audio.idPregunta}" class="play ${audio.id}">${this.icons.playIcon}</button>
         <input class="range ex1-${audio.id}" type="range" value="0" min="0" max="100"/>
-        <button class="remove ${audio.id}" >${this.icons.deleteIcon}</button>
+        <button class="remove ${audio.id}" >${ this.icons.deleteIcon }</button>
       </div>
       <div class="MediaRecord-date">${dateStr}</div>
     </div>`
   }
 
-
 }
+
 (<any>window).RecordMedia = RecordMedia || {};
 
 if( jQuery ){
   (function( $ ){
-     $.fn.recordMedia = function({ idRegistro, idPregunta, nameServer, max, cordovaDir, success = (str:any)=>console.log(str), error = (str:any)=>console.log(str) }:any) {
+     $.fn.recordMedia = function({ 
+             idRegistro,
+             idPregunta,
+             maxRecords,
+             maxTime,
+             cordovaDir,
+             success,
+             error }:argsInterface) {
+
       let selector = this.selector;  
-      let app = new RecordMedia({ idRegistro, idPregunta, max, nameServer, selector, cordovaDir });
+      let app = new RecordMedia({ idRegistro, idPregunta, maxRecords, maxTime, selector, cordovaDir });
       // let init = app.init.bind(app);
       app.init({ success, error })
       // document.addEventListener('deviceready', init , false);

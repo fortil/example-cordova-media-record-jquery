@@ -36,23 +36,13 @@ NodeList.prototype.remove = HTMLCollection.prototype.remove = function () {
 };
 var RecordMedia = (function () {
     function RecordMedia(_a) {
-        var idRegistro = _a.idRegistro, idPregunta = _a.idPregunta, max = _a.max, nameServer = _a.nameServer, selector = _a.selector, cordovaDir = _a.cordovaDir;
-        this.arguments = {
-            selector: selector,
-            idRegistro: (idRegistro || MakeId()),
-            idPregunta: (idPregunta || MakeId()),
-            max: (max || 10000),
-            nameServer: (nameServer || undefined),
-        };
+        var _b = _a.idRegistro, idRegistro = _b === void 0 ? MakeId() : _b, _c = _a.idPregunta, idPregunta = _c === void 0 ? MakeId() : _c, _d = _a.maxRecords, maxRecords = _d === void 0 ? 10 : _d, _e = _a.maxTime, maxTime = _e === void 0 ? 10 : _e, _f = _a.cordovaDir, cordovaDir = _f === void 0 ? cordova.file.externalDataDirectory : _f, _g = _a.selector, selector = _g === void 0 ? 'div' : _g;
+        this.argumentos = { selector: selector, idRegistro: idRegistro, idPregunta: idPregunta, maxRecords: maxRecords, maxTime: maxTime };
         this.audio = {};
         this.DB;
-        this.cordovaDir = cordovaDir || cordova.file.externalDataDirectory;
+        this.cordovaDir = cordovaDir;
         // Default Icons
-        this.icons = {
-            playIcon: this.getIcon('play_arrow'),
-            stopIcon: this.getIcon('pause'),
-            deleteIcon: this.getIcon('clear')
-        };
+        this.icons = { playIcon: this.getIcon('play_arrow'), stopIcon: this.getIcon('pause'), deleteIcon: this.getIcon('clear') };
         // Default strings
         this.strings = {
             recording: 'Detener grabación',
@@ -63,21 +53,19 @@ var RecordMedia = (function () {
             fields: 'id,name,path,idRegistro,idPregunta,type,duration,date',
             tablename: 'RECORDS',
         };
-        this.record = { recording: false };
+        this.record = { recording: false, timerOut: null };
     }
     RecordMedia.prototype.getIcon = function (icon) {
         return "<i class=\"material-icons md-18\">" + icon + "</i>";
     };
     RecordMedia.prototype.init = function (_a) {
         var _this = this;
-        var success = _a.success, error = _a.error;
-        var rec = this.recordAudio.bind(this);
-        var agrs = this.arguments;
-        var btn = document.querySelector(this.arguments.selector);
+        var _b = _a.success, success = _b === void 0 ? function (res) { return console.log(res); } : _b, _c = _a.error, error = _c === void 0 ? function (error) { return console.log(error); } : _c;
+        var btn = document.querySelector(this.argumentos.selector);
         // let btn = $(''+this.arguments.selector);
         btn.addEventListener('click', function (evt) {
             evt.preventDefault();
-            rec(agrs);
+            _this.recordAudio(_this.argumentos);
         }, false);
         // Otiene los strings a mostrar, sino hay deja los default
         this.strings = {
@@ -103,25 +91,25 @@ var RecordMedia = (function () {
         //   app: this.arguments,
         // });
         var divMsj = document.createElement('div');
-        divMsj.className = "mensaje alignAbsoluteCenter " + this.arguments.idRegistro + " " + this.arguments.idPregunta;
+        divMsj.className = "mensaje alignAbsoluteCenter " + this.argumentos.idRegistro + " " + this.argumentos.idPregunta;
         divMsj.innerHTML = divMsj.innerHTML + this.strings.mjsrecord;
         btn.parentNode.insertBefore(divMsj, btn);
         // btn.after(this.strings.mjsdivrecord);
-        this.initView.bind(this)();
+        this.initView();
     };
     RecordMedia.prototype.initView = function () {
         var _this = this;
         // JS form
-        var medias = document.querySelector('#content-' + this.arguments.idRegistro + '_' + this.arguments.idPregunta);
+        var medias = document.querySelector('#content-' + this.argumentos.idRegistro + '_' + this.argumentos.idPregunta);
         if (medias != undefined)
             medias.innerHTML = '';
-        var idRegistro = this.arguments.idRegistro;
-        var idPregunta = this.arguments.idPregunta;
+        var idRegistro = this.argumentos.idRegistro;
+        var idPregunta = this.argumentos.idPregunta;
         this.DB.getVal({ idPregunta: idPregunta, idRegistro: idRegistro }, function (tx, songs) {
             if (songs.length > 0) {
                 for (var i = 0; i < songs.length; i++) {
-                    songs[i].selector = _this.arguments.selector;
-                    songs[i].max = _this.arguments.max;
+                    songs[i].selector = _this.argumentos.selector;
+                    songs[i].maxRecords = _this.argumentos.maxRecords;
                     _this.addAudioView(songs[i]);
                 }
             }
@@ -134,7 +122,7 @@ var RecordMedia = (function () {
     };
     RecordMedia.prototype.playPauseAudio = function (_a) {
         var _this = this;
-        var id = _a.id, path = _a.path, name = _a.name, selector = _a.selector, idRegistro = _a.idRegistro, idPregunta = _a.idPregunta, max = _a.max;
+        var id = _a.id, path = _a.path, name = _a.name, selector = _a.selector, idRegistro = _a.idRegistro, idPregunta = _a.idPregunta;
         var playIcon = this.icons.playIcon;
         var stopIcon = this.icons.stopIcon;
         var element = document.getElementsByClassName('range ex1-' + id)[0];
@@ -196,7 +184,7 @@ var RecordMedia = (function () {
     };
     RecordMedia.prototype.removeAudio = function (_a) {
         var _this = this;
-        var id = _a.id, path = _a.path, name = _a.name, selector = _a.selector, idRegistro = _a.idRegistro, idPregunta = _a.idPregunta, max = _a.max;
+        var id = _a.id, path = _a.path, name = _a.name, selector = _a.selector, idRegistro = _a.idRegistro, idPregunta = _a.idPregunta;
         if (confirm(this.strings.dialogconfirm + ' ' + name)) {
             resolveLocalFileSystemURL(this.cordovaDir, function (dir) {
                 dir.getFile(name, { create: true }, function (file) {
@@ -218,27 +206,36 @@ var RecordMedia = (function () {
     };
     RecordMedia.prototype.recordAudio = function (_a) {
         var _this = this;
-        var selector = _a.selector, idRegistro = _a.idRegistro, idPregunta = _a.idPregunta, max = _a.max;
+        var selector = _a.selector, idRegistro = _a.idRegistro, idPregunta = _a.idPregunta, maxRecords = _a.maxRecords, maxTime = _a.maxTime;
         var store = this.cordovaDir; //externalApplicationStorageDirectory; // window.externalApplicationStorageDirectory || window.PERSISTENT || window.TEMPORARY;
         var id = Date.now();
         var name = idRegistro + '_' + idPregunta + '__' + id + '.amr';
         var path = store + name;
         this.DB.getVal(null, function (tx, songs) {
             var lengthSongs = songs.length || (typeof songs == 'object' ? Object.keys(songs).length : 0);
-            if (lengthSongs >= max) {
+            if (lengthSongs >= maxRecords) {
                 _this.functions.error(_this.strings.alertmaxrecord);
             }
             else {
                 if (_this.record.recording == true) {
+                    clearTimeout(_this.record.timerOut);
                     _this.record.media.stopRecord();
                     _this.record.recording = false;
-                    _this.stopRecordView.bind(_this)(selector);
+                    _this.stopRecordView(selector);
                 }
                 else {
+                    _this.record.timerOut = setTimeout(function () {
+                        if (_this.record.recording == true) {
+                            clearTimeout(_this.record.timerOut);
+                            _this.record.media.stopRecord();
+                            _this.record.recording = false;
+                            _this.stopRecordView(selector);
+                        }
+                    }, _this.argumentos.maxTime);
                     _this.record.recording = true;
                     _this.record.media = new Media(path, function (e) {
                         _this.functions.error("Success ", e);
-                        _this.addAudio({ id: id, path: path, name: name, selector: selector, idRegistro: idRegistro, idPregunta: idPregunta, max: max });
+                        _this.addAudio({ id: id, path: path, name: name, selector: selector, idRegistro: idRegistro, idPregunta: idPregunta });
                     }, _this.functions.error);
                     _this.record.media.startRecord();
                     _this.startRecordView.bind(_this)(selector);
@@ -247,20 +244,20 @@ var RecordMedia = (function () {
         });
     };
     RecordMedia.prototype.addAudio = function (_a) {
-        var id = _a.id, path = _a.path, name = _a.name, selector = _a.selector, idRegistro = _a.idRegistro, idPregunta = _a.idPregunta, max = _a.max;
+        var id = _a.id, path = _a.path, name = _a.name, selector = _a.selector, idRegistro = _a.idRegistro, idPregunta = _a.idPregunta;
         // ['id', 'name', 'path', 'idRegistro', 'idPregunta', 'type', 'duration', 'date']
         var date = new Date().getTime();
         this.DB.insert({ id: id, name: name, path: path, idRegistro: idRegistro, idPregunta: idPregunta, 'type': 'audio', 'duration': '4.0', date: date });
-        this.addAudioView.bind(this)({ id: id, path: path, name: name, selector: selector, idRegistro: idRegistro, idPregunta: idPregunta, max: max, date: date });
+        this.addAudioView.bind(this)({ id: id, path: path, name: name, selector: selector, idRegistro: idRegistro, idPregunta: idPregunta, date: date });
     };
     RecordMedia.prototype.startRecordView = function (selector) {
         document.querySelector(selector + '').innerHTML = this.strings.recording;
-        var doc = document.getElementsByClassName('mensaje ' + this.arguments.idRegistro + ' ' + this.arguments.idPregunta)[0];
+        var doc = document.getElementsByClassName('mensaje ' + this.argumentos.idRegistro + ' ' + this.argumentos.idPregunta)[0];
         doc.style.visibility = 'visible';
     };
     RecordMedia.prototype.stopRecordView = function (selector) {
         document.querySelector(selector + '').innerHTML = this.strings.stoprecord;
-        var doc = document.getElementsByClassName('mensaje ' + this.arguments.idRegistro + ' ' + this.arguments.idPregunta)[0];
+        var doc = document.getElementsByClassName('mensaje ' + this.argumentos.idRegistro + ' ' + this.argumentos.idPregunta)[0];
         doc.style.visibility = 'hidden';
     };
     RecordMedia.prototype.addAudioView = function (audio) {
@@ -287,7 +284,7 @@ var RecordMedia = (function () {
         var date = (new Date(audio.date).toISOString()).split('T');
         var time = date[1].split('.')[0];
         var dateStr = date[0] + " " + time;
-        return "<div class=\"MediaRecord-media " + audio.id + " " + audio.idRegistro + " " + audio.idPregunta + "\">\n      <div class=\"MediaRecord-buttons-media\">\n        <button data-url=\"" + audio.path + "\" data-name=\"" + audio.name + "\" class=\"play " + audio.id + "\">" + this.icons.playIcon + "</button>\n        <input class=\"range ex1-" + audio.id + "\" type=\"range\" value=\"0\" min=\"0\" max=\"100\"/>\n        <button class=\"remove " + audio.id + "\" >" + this.icons.deleteIcon + "</button>\n      </div>\n      <div class=\"MediaRecord-date\">" + dateStr + "</div>\n    </div>";
+        return "<div class=\"MediaRecord-media " + audio.id + " " + audio.idRegistro + " " + audio.idPregunta + "\">\n      <div class=\"MediaRecord-buttons-media\">\n        <button data-url=\"" + audio.path + "\" data-name=\"" + audio.name + "\"  data-idregistro=\"" + audio.idRegistro + "\" data-idpregunta=\"" + audio.idPregunta + "\" class=\"play " + audio.id + "\">" + this.icons.playIcon + "</button>\n        <input class=\"range ex1-" + audio.id + "\" type=\"range\" value=\"0\" min=\"0\" max=\"100\"/>\n        <button class=\"remove " + audio.id + "\" >" + this.icons.deleteIcon + "</button>\n      </div>\n      <div class=\"MediaRecord-date\">" + dateStr + "</div>\n    </div>";
     };
     return RecordMedia;
 }());
@@ -295,9 +292,9 @@ window.RecordMedia = RecordMedia || {};
 if (jQuery) {
     (function ($) {
         $.fn.recordMedia = function (_a) {
-            var idRegistro = _a.idRegistro, idPregunta = _a.idPregunta, nameServer = _a.nameServer, max = _a.max, cordovaDir = _a.cordovaDir, _b = _a.success, success = _b === void 0 ? function (str) { return console.log(str); } : _b, _c = _a.error, error = _c === void 0 ? function (str) { return console.log(str); } : _c;
+            var idRegistro = _a.idRegistro, idPregunta = _a.idPregunta, maxRecords = _a.maxRecords, maxTime = _a.maxTime, cordovaDir = _a.cordovaDir, success = _a.success, error = _a.error;
             var selector = this.selector;
-            var app = new RecordMedia({ idRegistro: idRegistro, idPregunta: idPregunta, max: max, nameServer: nameServer, selector: selector, cordovaDir: cordovaDir });
+            var app = new RecordMedia({ idRegistro: idRegistro, idPregunta: idPregunta, maxRecords: maxRecords, maxTime: maxTime, selector: selector, cordovaDir: cordovaDir });
             // let init = app.init.bind(app);
             app.init({ success: success, error: error });
             // document.addEventListener('deviceready', init , false);

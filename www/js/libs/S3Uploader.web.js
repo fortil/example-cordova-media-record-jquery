@@ -31,9 +31,9 @@
                 console.log(err);
             };
         }
-        CalculateMD5Hash_1.calculateMD5Hash(conf.imageUrl, function(hashMD5) {
+        CalculateMD5Hash_1.calculateMD5Hash(conf.filePath, function(hashMD5) {
             var Hash = new GenerateHashS3_1.GenerateHashS3(conf.bucket, conf.secret, conf.awsKey);
-            var data = Hash.generate(conf.folder + conf.fileName, conf.folder, md5 && md5 == true ? hashMD5 : false);
+            var data = Hash.generate(conf.folder + conf.fileName, conf.folder, md5 && md5 == true ? hashMD5 : false, conf.meta && typeof conf.meta == "object" ? conf.meta : false);
             var mime = new GetMime_1.GetMime();
             var params = {
                 key: conf.folder + conf.fileName,
@@ -55,10 +55,15 @@
             options.httpMethod = "POST";
             var uri = encodeURI(conf.urlServer);
             if (conf.headers) {
-                var headers = conf.headers;
-                options.headers = headers;
-                delete params.headers;
+                var headKeys = Object.keys(conf.headers);
+                for (var i = 0, l = headKeys.length; i < l; ++i) {
+                    params[headKeys[i]] = conf.headers[headKeys[i]];
+                }
             }
+            if (conf.meta) {
+                options.meta = conf.meta;
+            }
+            console.log("options s3-uploader: ", options);
             options.params = params;
             var ft = new FileTransfer();
             ft.upload(conf.filePath, uri, successCB, errorCB, options);
@@ -84,7 +89,7 @@
                 this.secret = secret;
                 this.awsKey = awsKey;
             }
-            GenerateHashS3.prototype.generate = function(fileName, folder, md5) {
+            GenerateHashS3.prototype.generate = function(fileName, folder, md5, meta) {
                 if (folder === void 0) {
                     folder = "test/";
                 }
@@ -100,6 +105,12 @@
                     }, [ "starts-with", "$Content-Type", "" ], [ "content-length-range", 0, 10485760 ] ]
                 };
                 if (md5 && md5 != false) policy.conditions.push([ "starts-with", "$Content-MD5", "" ]);
+                if (meta && meta != false) {
+                    for (var i = 0, e = meta.length; i < e; ++i) {
+                        policy.conditions.push(meta[i]);
+                    }
+                }
+                console.log("GenerateHashS3 policy: ", policy);
                 var policyBase64 = new Buffer(JSON.stringify(policy), "utf8").toString("base64");
                 var bucket = this.bucket;
                 var awsKey = this.awsKey;

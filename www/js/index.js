@@ -8,11 +8,15 @@ document.addEventListener('deviceready', function(){
   $('#recordSong').recordMedia({ 
     'idRegistro': idRegistro, 
     'idPregunta': idPregunta, 
-    'max': max });
+    'maxRecords': max,
+    'maxTime': 20000
+  });
   $('#recordSong2').recordMedia({ 
     'idRegistro': idRegistro, 
     'idPregunta': 'cual', 
-    'max': max });
+    'maxRecords': max,
+    'maxTime': 20000
+  });
 
 
   $('#upload').click(function(event) {
@@ -20,23 +24,33 @@ document.addEventListener('deviceready', function(){
 
       var filePath = $(this).data('url');
       var fileName = $(this).data('name');
+      var idPregunta = $(this).data('idpregunta');
+      var idRegistro = $(this).data('idregistro');
       /*
       * Sube archivos a S3 aws
       */
-      setTimeout(function(argument) {
-        s3Uploader(
-          {
-            filePath: filePath,
-            bucket: Bucket,
-            awsKey: awsKey,
-            secret: secret,
-            folder: Folder,
-            fileName: fileName,
-            urlServer: urlAWS,
+      s3Uploader(
+        {
+          filePath: filePath,
+          bucket: Bucket,
+          awsKey: awsKey,
+          secret: secret,
+          folder: Folder,
+          fileName: fileName,
+          urlServer: urlAWS,
+          headers:{
+            "x-amz-meta-idpregunta": idPregunta,
+            "x-amz-meta-idregistro": idRegistro,
           },
-          true
-        )
-      }, 0)
+          meta:[
+             ["starts-with", "$x-amz-meta-idpregunta", ""],
+             ["starts-with", "$x-amz-meta-idregistro", ""],
+          ]
+        },
+        true
+      )
+      // setTimeout(function(argument) {
+      // }, 0)
 
       // UploadRecordMedia({
       //   path: $(this).data('url'),
